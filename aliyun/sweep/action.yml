@@ -1,0 +1,29 @@
+name: Sweep leftover Alibaba Cloud spot runners
+description: Destroy every CI machine older than the maximum age in the region. One schedule covers every repository that uses this tool there.
+inputs:
+  access-key-id:
+    description: AccessKey ID of the RAM user.
+    required: true
+  access-key-secret:
+    description: AccessKey secret of the RAM user.
+    required: true
+  prefixes:
+    description: Space-separated machine-name prefixes to sweep.
+    default: ci-
+  max-age-minutes:
+    description: Destroy machines older than this.
+    default: '75'
+  region:
+    description: Alibaba Cloud region.
+    default: ap-southeast-5
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: node "$GITHUB_ACTION_PATH/../../aliyun-runner.mjs" sweep
+      env:
+        ALIYUN_ACCESS_KEY_ID: ${{ inputs.access-key-id }}
+        ALIYUN_ACCESS_KEY_SECRET: ${{ inputs.access-key-secret }}
+        SPOT_SWEEP_PREFIXES: ${{ inputs.prefixes }}
+        SPOT_MAX_AGE_MINUTES: ${{ inputs.max-age-minutes }}
+        ALIYUN_REGION: ${{ inputs.region }}

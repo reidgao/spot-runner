@@ -1,0 +1,46 @@
+name: Bake an Alibaba Cloud runner image
+description: Build this repository's boot image on a small spot machine (Docker, the given container images, the GitHub Actions runner, Node in the runner's tool cache), then delete all but the newest images.
+inputs:
+  access-key-id:
+    description: AccessKey ID of the RAM user.
+    required: true
+  access-key-secret:
+    description: AccessKey secret of the RAM user.
+    required: true
+  prepull-images:
+    description: Space-separated Docker images to bake in, such as the test job's container image.
+    default: ''
+  node-versions:
+    description: Space-separated Node versions to put in the runner's tool cache, for actions/setup-node (for example the contents of .node-version).
+    default: ''
+  region:
+    description: Alibaba Cloud region.
+    default: ap-southeast-5
+  image-prefix:
+    description: Name prefix of this repository's images (default ci-runner-<repository>-).
+    default: ''
+  builder-types:
+    description: Space-separated instance types to build on, first available wins.
+    default: ecs.g9ae.xlarge ecs.g9ae.2xlarge ecs.g9i.xlarge ecs.c9i.xlarge
+  keep:
+    description: How many of this repository's newest images to keep.
+    default: '2'
+outputs:
+  image-id:
+    description: The new image.
+    value: ${{ steps.bake.outputs.image-id }}
+runs:
+  using: composite
+  steps:
+    - id: bake
+      shell: bash
+      run: node "$GITHUB_ACTION_PATH/../../aliyun-runner.mjs" bake
+      env:
+        ALIYUN_ACCESS_KEY_ID: ${{ inputs.access-key-id }}
+        ALIYUN_ACCESS_KEY_SECRET: ${{ inputs.access-key-secret }}
+        SPOT_PREPULL_IMAGES: ${{ inputs.prepull-images }}
+        SPOT_BAKE_NODE_VERSIONS: ${{ inputs.node-versions }}
+        ALIYUN_REGION: ${{ inputs.region }}
+        SPOT_IMAGE_PREFIX: ${{ inputs.image-prefix }}
+        SPOT_BAKE_TYPES: ${{ inputs.builder-types }}
+        SPOT_KEEP_IMAGES: ${{ inputs.keep }}

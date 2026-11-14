@@ -1,11 +1,11 @@
-name: Stop a Tencent Cloud spot runner
+name: Stop an Alibaba Cloud spot runner
 description: Destroy the machine the start action bought and remove its runner registration.
 inputs:
-  secret-id:
-    description: Tencent Cloud SecretId.
+  access-key-id:
+    description: AccessKey ID of the RAM user.
     required: true
-  secret-key:
-    description: Tencent Cloud SecretKey.
+  access-key-secret:
+    description: AccessKey secret of the RAM user.
     required: true
   github-token:
     description: The same GitHub token the start action used.
@@ -17,17 +17,17 @@ inputs:
     description: The start action's label output.
     required: true
   region:
-    description: Tencent Cloud region.
-    default: ap-hongkong
+    description: Alibaba Cloud region.
+    default: ap-southeast-5
 runs:
   using: composite
   steps:
     - shell: bash
-      run: node "$GITHUB_ACTION_PATH/../tencent-runner.mjs" stop
+      run: node "$GITHUB_ACTION_PATH/../../aliyun-runner.mjs" stop
       env:
-        TENCENT_SECRET_ID: ${{ inputs.secret-id }}
-        TENCENT_SECRET_KEY: ${{ inputs.secret-key }}
+        ALIYUN_ACCESS_KEY_ID: ${{ inputs.access-key-id }}
+        ALIYUN_ACCESS_KEY_SECRET: ${{ inputs.access-key-secret }}
         RUNNER_GITHUB_TOKEN: ${{ inputs.github-token }}
         INSTANCE_ID: ${{ inputs.instance-id }}
         RUNNER_LABEL: ${{ inputs.label }}
-        SPOT_REGION: ${{ inputs.region }}
+        ALIYUN_REGION: ${{ inputs.region }}

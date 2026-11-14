@@ -20,7 +20,7 @@ runs:
   using: composite
   steps:
     - shell: bash
-      run: node "$GITHUB_ACTION_PATH/../tencent-runner.mjs" sweep
+      run: node "$GITHUB_ACTION_PATH/../../tencent-runner.mjs" sweep
       env:
         TENCENT_SECRET_ID: ${{ inputs.secret-id }}
         TENCENT_SECRET_KEY: ${{ inputs.secret-key }}

@@ -186,6 +186,8 @@ function bootScript({ repo, token, name, runnerVersion, images }) {
     'tar xzf runner.tgz',
     './bin/installdependencies.sh',
     'chown -R ci:ci /home/ci',
+    // Keeps the registration token out of the log.
+    'set +x',
     `sudo -u ci ./config.sh --unattended --ephemeral --disableupdate --url https://github.com/${repo} --token ${token} --name ${name} --labels ${name}`,
     'sudo -u ci ./run.sh',
     '',

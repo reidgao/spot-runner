@@ -1,0 +1,65 @@
+name: Start an Alibaba Cloud spot runner
+description: Buy one Alibaba Cloud spot ECS machine, register it as an ephemeral self-hosted runner for this repository, and wait until it is online.
+inputs:
+  access-key-id:
+    description: AccessKey ID of a RAM user (see docs/aliyun.md for the policy).
+    required: true
+  access-key-secret:
+    description: AccessKey secret of the same RAM user.
+    required: true
+  github-token:
+    description: Fine-grained GitHub token with Administration read and write on this repository.
+    required: true
+  sizes:
+    description: >-
+      JSON list of instance types to try, best first, such as
+      [{"type":"ecs.g9ae.24xlarge","workers":60},{"type":"ecs.g9ae.16xlarge","workers":40}].
+      Extra fields come back in the size output, so put the worker counts you measured on each type there.
+    default: '[{"type":"ecs.g9ae.24xlarge"},{"type":"ecs.g9ae.16xlarge"}]'
+  max-cny-per-hour:
+    description: Highest spot price per hour, in CNY. Also sent to Alibaba Cloud as the price limit.
+    default: '20'
+  prepull-images:
+    description: Space-separated Docker images the machine needs, such as the job's container image. Skipped when the baked image has them.
+    default: ''
+  region:
+    description: Alibaba Cloud region.
+    default: ap-southeast-5
+  disk-gb:
+    description: System disk size in GB.
+    default: '100'
+  image-prefix:
+    description: Name prefix of this repository's baked images (default ci-runner-<repository>-).
+    default: ''
+outputs:
+  ready:
+    description: '"true" once the runner is online. Gate the job that uses the machine on it.'
+    value: ${{ steps.spot.outputs.ready }}
+  label:
+    description: 'The runner label, for runs-on: [self-hosted, <label>].'
+    value: ${{ steps.spot.outputs.label }}
+  instance-id:
+    description: The machine to destroy with the stop action.
+    value: ${{ steps.spot.outputs.instance-id }}
+  size:
+    description: The chosen entry of sizes, as JSON; read it with fromJSON().
+    value: ${{ steps.spot.outputs.size }}
+  per-hour:
+    description: The machine's spot price per hour, in CNY.
+    value: ${{ steps.spot.outputs.per-hour }}
+runs:
+  using: composite
+  steps:
+    - id: spot
+      shell: bash
+      run: node "$GITHUB_ACTION_PATH/../../aliyun-runner.mjs" start
+      env:
+        ALIYUN_ACCESS_KEY_ID: ${{ inputs.access-key-id }}
+        ALIYUN_ACCESS_KEY_SECRET: ${{ inputs.access-key-secret }}
+        RUNNER_GITHUB_TOKEN: ${{ inputs.github-token }}
+        SPOT_SIZES: ${{ inputs.sizes }}
+        SPOT_MAX_CNY_PER_HOUR: ${{ inputs.max-cny-per-hour }}
+        SPOT_PREPULL_IMAGES: ${{ inputs.prepull-images }}
+        ALIYUN_REGION: ${{ inputs.region }}
+        SPOT_DISK_GB: ${{ inputs.disk-gb }}
+        SPOT_IMAGE_PREFIX: ${{ inputs.image-prefix }}

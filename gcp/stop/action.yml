@@ -1,0 +1,37 @@
+name: Stop a Google Cloud spot runner
+description: Delete the VM the start action bought and remove its runner registration.
+inputs:
+  project:
+    description: Google Cloud project ID.
+    required: true
+  workload-identity-provider:
+    description: The same provider the start action used.
+    default: ''
+  service-account:
+    description: The same service account the start action used, if any.
+    default: ''
+  access-token:
+    description: A Google access token to use instead of Workload Identity Federation.
+    default: ''
+  github-token:
+    description: The same GitHub token the start action used.
+    required: true
+  instance-id:
+    description: The start action's instance-id output.
+    required: true
+  label:
+    description: The start action's label output.
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: node "$GITHUB_ACTION_PATH/../../gcp-runner.mjs" stop
+      env:
+        GCP_PROJECT: ${{ inputs.project }}
+        GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.workload-identity-provider }}
+        GCP_SERVICE_ACCOUNT: ${{ inputs.service-account }}
+        GCP_ACCESS_TOKEN: ${{ inputs.access-token }}
+        RUNNER_GITHUB_TOKEN: ${{ inputs.github-token }}
+        INSTANCE_ID: ${{ inputs.instance-id }}
+        RUNNER_LABEL: ${{ inputs.label }}

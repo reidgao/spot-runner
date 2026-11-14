@@ -1,0 +1,54 @@
+name: Bake a Google Cloud runner image
+description: Build this repository's boot image on a small standard VM (Docker, the given container images, the GitHub Actions runner, Node in the runner's tool cache), then delete all but the newest images of its family.
+inputs:
+  project:
+    description: Google Cloud project ID.
+    required: true
+  workload-identity-provider:
+    description: The provider that trusts this repository.
+    default: ''
+  service-account:
+    description: Service account to act as, if any.
+    default: ''
+  access-token:
+    description: A Google access token to use instead of Workload Identity Federation.
+    default: ''
+  prepull-images:
+    description: Space-separated Docker images to bake in, such as the test job's container image.
+    default: ''
+  node-versions:
+    description: Space-separated Node versions to put in the runner's tool cache, for actions/setup-node (for example the contents of .node-version).
+    default: ''
+  region:
+    description: Region to build in; images are stored in the nearest multi-region and boot anywhere.
+    default: us-central1
+  image-family:
+    description: This repository's image family (default ci-runner-<repository>).
+    default: ''
+  builder-types:
+    description: Space-separated machine types to build on, first available wins.
+    default: c4d-highcpu-4 n2-highcpu-4 e2-standard-4
+  keep:
+    description: How many of the family's newest images to keep.
+    default: '2'
+outputs:
+  image-id:
+    description: The new image's name.
+    value: ${{ steps.bake.outputs.image-id }}
+runs:
+  using: composite
+  steps:
+    - id: bake
+      shell: bash
+      run: node "$GITHUB_ACTION_PATH/../../gcp-runner.mjs" bake
+      env:
+        GCP_PROJECT: ${{ inputs.project }}
+        GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.workload-identity-provider }}
+        GCP_SERVICE_ACCOUNT: ${{ inputs.service-account }}
+        GCP_ACCESS_TOKEN: ${{ inputs.access-token }}
+        SPOT_PREPULL_IMAGES: ${{ inputs.prepull-images }}
+        SPOT_BAKE_NODE_VERSIONS: ${{ inputs.node-versions }}
+        GCP_REGION: ${{ inputs.region }}
+        SPOT_IMAGE_FAMILY: ${{ inputs.image-family }}
+        SPOT_BAKE_TYPES: ${{ inputs.builder-types }}
+        SPOT_KEEP_IMAGES: ${{ inputs.keep }}

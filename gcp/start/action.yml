@@ -1,0 +1,73 @@
+name: Start a Google Cloud spot runner
+description: Buy one Google Cloud spot VM, register it as an ephemeral self-hosted runner for this repository, and wait until it is online.
+inputs:
+  project:
+    description: Google Cloud project ID.
+    required: true
+  workload-identity-provider:
+    description: >-
+      Full name of the Workload Identity Federation provider that trusts this repository, such as
+      projects/123456789/locations/global/workloadIdentityPools/github/providers/github (see docs/gcp.md).
+      The job needs permissions id-token write.
+    default: ''
+  service-account:
+    description: Service account to act as. Leave empty to use the federated identity directly.
+    default: ''
+  access-token:
+    description: A Google access token to use instead of Workload Identity Federation, for example from google-github-actions/auth.
+    default: ''
+  github-token:
+    description: Fine-grained GitHub token with Administration read and write on this repository.
+    required: true
+  sizes:
+    description: >-
+      JSON list of machine types to try, best first, such as
+      [{"type":"c4d-highcpu-96","workers":60},{"type":"c4d-highcpu-48","workers":30}].
+      Extra fields come back in the size output, so put the worker counts you measured on each type there.
+    default: '[{"type":"c4d-highcpu-96"},{"type":"c4d-highcpu-48"}]'
+  prepull-images:
+    description: Space-separated Docker images the VM needs, such as the job's container image. Skipped when the baked image has them.
+    default: ''
+  region:
+    description: Google Cloud region; every zone in it is tried.
+    default: us-central1
+  disk-gb:
+    description: Boot disk size in GB.
+    default: '100'
+  max-run-minutes:
+    description: Google Cloud deletes the VM after this long even if the stop job never runs. Keep it above the job's timeout.
+    default: '90'
+  image-family:
+    description: This repository's baked image family (default ci-runner-<repository>).
+    default: ''
+outputs:
+  ready:
+    description: '"true" once the runner is online. Gate the job that uses the machine on it.'
+    value: ${{ steps.spot.outputs.ready }}
+  label:
+    description: 'The runner label, for runs-on: [self-hosted, <label>].'
+    value: ${{ steps.spot.outputs.label }}
+  instance-id:
+    description: The VM to delete with the stop action, as zone/name.
+    value: ${{ steps.spot.outputs.instance-id }}
+  size:
+    description: The chosen entry of sizes, as JSON; read it with fromJSON().
+    value: ${{ steps.spot.outputs.size }}
+runs:
+  using: composite
+  steps:
+    - id: spot
+      shell: bash
+      run: node "$GITHUB_ACTION_PATH/../../gcp-runner.mjs" start
+      env:
+        GCP_PROJECT: ${{ inputs.project }}
+        GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.workload-identity-provider }}
+        GCP_SERVICE_ACCOUNT: ${{ inputs.service-account }}
+        GCP_ACCESS_TOKEN: ${{ inputs.access-token }}
+        RUNNER_GITHUB_TOKEN: ${{ inputs.github-token }}
+        SPOT_SIZES: ${{ inputs.sizes }}
+        SPOT_PREPULL_IMAGES: ${{ inputs.prepull-images }}
+        GCP_REGION: ${{ inputs.region }}
+        SPOT_DISK_GB: ${{ inputs.disk-gb }}
+        SPOT_MAX_RUN_MINUTES: ${{ inputs.max-run-minutes }}
+        SPOT_IMAGE_FAMILY: ${{ inputs.image-family }}

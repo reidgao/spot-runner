@@ -1,0 +1,33 @@
+name: Sweep leftover Google Cloud spot runners
+description: Delete every VM in the project, in any zone, that carries the ci-runner label, has a sweep prefix and is older than the maximum age. One schedule covers every repository that uses this tool in the project.
+inputs:
+  project:
+    description: Google Cloud project ID.
+    required: true
+  workload-identity-provider:
+    description: The provider that trusts this repository.
+    default: ''
+  service-account:
+    description: Service account to act as, if any.
+    default: ''
+  access-token:
+    description: A Google access token to use instead of Workload Identity Federation.
+    default: ''
+  prefixes:
+    description: Space-separated VM name prefixes to sweep.
+    default: ci-
+  max-age-minutes:
+    description: Delete VMs older than this.
+    default: '75'
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: node "$GITHUB_ACTION_PATH/../../gcp-runner.mjs" sweep
+      env:
+        GCP_PROJECT: ${{ inputs.project }}
+        GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.workload-identity-provider }}
+        GCP_SERVICE_ACCOUNT: ${{ inputs.service-account }}
+        GCP_ACCESS_TOKEN: ${{ inputs.access-token }}
+        SPOT_SWEEP_PREFIXES: ${{ inputs.prefixes }}
+        SPOT_MAX_AGE_MINUTES: ${{ inputs.max-age-minutes }}

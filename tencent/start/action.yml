@@ -49,7 +49,7 @@ runs:
   steps:
     - id: spot
       shell: bash
-      run: node "$GITHUB_ACTION_PATH/../tencent-runner.mjs" start
+      run: node "$GITHUB_ACTION_PATH/../../tencent-runner.mjs" start
       env:
         TENCENT_SECRET_ID: ${{ inputs.secret-id }}
         TENCENT_SECRET_KEY: ${{ inputs.secret-key }}
