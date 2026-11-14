@@ -46,6 +46,26 @@ export function sizes(fallback, example) {
   return list;
 }
 
+/**
+ * Runs a request again when it fails before an answer arrives (a reset
+ * connection, a DNS hiccup), and names the host when it gives up. Each call
+ * must be safe to repeat: the scripts sign every attempt afresh and give
+ * every purchase an idempotency token.
+ */
+export async function withRetry(send, host, attempts = 3) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await send();
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+      const reason = `${error.message}${error.cause?.code ? ` (${error.cause.code})` : ''}`;
+      if (attempt >= attempts) throw new Error(`${host}: ${reason}`, { cause: error });
+      console.warn(`${host}: ${reason}; trying again`);
+      await sleep(attempt * 2_000);
+    }
+  }
+}
+
 export async function waitFor(check, timeoutMs, what) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -67,14 +87,18 @@ export function setOutputs(values) {
 
 export async function github(path, init = {}) {
   const token = process.env.RUNNER_GITHUB_TOKEN;
-  const response = await fetch(`https://api.github.com${path}`, {
-    ...init,
-    headers: {
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
+  const response = await withRetry(
+    () =>
+      fetch(`https://api.github.com${path}`, {
+        ...init,
+        headers: {
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      }),
+    'api.github.com',
+  );
   if (!response.ok) throw new Error(`GitHub ${path}: ${response.status}`);
   return response.status === 204 ? null : response.json();
 }
@@ -123,7 +147,8 @@ export async function run(commands, script) {
     process.exit(2);
   }
   await command().catch((error) => {
-    console.error(error.message);
+    const cause = error.cause?.cause?.code ?? error.cause?.code;
+    console.error(cause && !error.message.includes(cause) ? `${error.message} (${cause})` : error.message);
     process.exit(1);
   });
 }

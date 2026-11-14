@@ -18,6 +18,7 @@
  * fetch is used, so no third-party package runs next to the token.
  * docs/gcp.md has the setup.
  */
+import { randomUUID } from 'node:crypto';
 import { BAKE_DONE, BAKE_FAILED, bakeScript, bootScript } from './boot-scripts.mjs';
 import {
   NAME_PREFIX,
@@ -34,6 +35,7 @@ import {
   stamp,
   waitFor,
   waitForRunner,
+  withRetry,
   words,
 } from './common.mjs';
 
@@ -61,11 +63,15 @@ const tail = (text, lines = 40) => text.split('\n').slice(-lines).join('\n');
 let cachedToken = '';
 
 async function postJson(url, body, token) {
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify(body),
-  });
+  const response = await withRetry(
+    () =>
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(body),
+      }),
+    new URL(url).host,
+  );
   const json = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(`${url}: ${response.status} ${json.error_description ?? json.error?.message ?? ''}`);
@@ -78,9 +84,13 @@ async function githubOidcToken(audience) {
   if (!url) {
     throw new Error('no GitHub OIDC token: give the job `permissions: id-token: write`, or set GCP_ACCESS_TOKEN');
   }
-  const response = await fetch(`${url}&audience=${encodeURIComponent(audience)}`, {
-    headers: { Authorization: `Bearer ${required('ACTIONS_ID_TOKEN_REQUEST_TOKEN')}` },
-  });
+  const response = await withRetry(
+    () =>
+      fetch(`${url}&audience=${encodeURIComponent(audience)}`, {
+        headers: { Authorization: `Bearer ${required('ACTIONS_ID_TOKEN_REQUEST_TOKEN')}` },
+      }),
+    'GitHub OIDC',
+  );
   if (!response.ok) throw new Error(`GitHub OIDC token: ${response.status}`);
   return (await response.json()).value;
 }
@@ -111,12 +121,19 @@ async function accessToken() {
 /* ── Compute Engine API ──────────────────────────────────────────────── */
 
 async function compute(method, path, body) {
-  const url = path.startsWith('https://') ? path : `${COMPUTE}/projects/${project()}/${path}`;
-  const response = await fetch(url, {
-    method,
-    headers: { Authorization: `Bearer ${await accessToken()}`, 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const base = path.startsWith('https://') ? path : `${COMPUTE}/projects/${project()}/${path}`;
+  // A request ID makes a change that is sent again (after a lost answer) happen once.
+  const url = method === 'GET' || base.endsWith('/wait') ? base : `${base}${base.includes('?') ? '&' : '?'}requestId=${randomUUID()}`;
+  const token = await accessToken();
+  const response = await withRetry(
+    () =>
+      fetch(url, {
+        method,
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined,
+      }),
+    'compute.googleapis.com',
+  );
   if (response.status === 404 && method === 'GET') return null;
   const json = await response.json().catch(() => ({}));
   if (!response.ok) {

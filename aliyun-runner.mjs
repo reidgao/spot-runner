@@ -30,6 +30,7 @@ import {
   registrationToken,
   removeRunner,
   repoSlug,
+  withRetry,
   required,
   run,
   setOutputs,
@@ -75,8 +76,13 @@ const encode = (text) =>
   encodeURIComponent(text).replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
 
 async function call(product, action, params = {}) {
-  const { id, secret } = credentials();
   const host = `${product}.${region()}.aliyuncs.com`;
+  return withRetry(() => send(host, product, action, params), host);
+}
+
+/** Signs and sends one request; a fresh date and nonce each time, so a retry is a new request. */
+async function send(host, product, action, params) {
+  const { id, secret } = credentials();
   const query = Object.entries({ RegionId: region(), ...params })
     .filter(([, value]) => value !== undefined)
     .map(([key, value]) => [encode(key), encode(String(value))])
@@ -282,7 +288,9 @@ async function launch(offers, build) {
   for (const offer of offers.slice(0, MAX_ATTEMPTS)) {
     try {
       console.info(`Trying ${offer.type} in ${offer.zone} (¥${offer.perHour}/hour)`);
-      const { InstanceIdSets } = await ecs('RunInstances', build(offer));
+      // The token makes a repeated request (after a lost answer) buy nothing more.
+      const token = `${offer.zone}-${offer.type}-${randomBytes(8).toString('hex')}`;
+      const { InstanceIdSets } = await ecs('RunInstances', { ...build(offer), ClientToken: token });
       return { offer, instanceId: InstanceIdSets.InstanceIdSet[0] };
     } catch (error) {
       if (error.code === 'DryRunOperation') return { offer, instanceId: '' };
