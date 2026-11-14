@@ -168,7 +168,8 @@ on:
 jobs:
   bake:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # Alibaba Cloud can take most of an hour to create an image.
+    timeout-minutes: 90
     steps:
       - uses: reidgao/spot-runner/aliyun/bake@v2
         with:

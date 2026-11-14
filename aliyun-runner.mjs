@@ -52,7 +52,8 @@ const DEFAULT_BUILDER_TYPES = 'ecs.g9ae.xlarge ecs.g9ae.2xlarge ecs.g9i.xlarge e
 const MAX_ATTEMPTS = 6;
 const BANDWIDTH_MBPS = 100;
 const BAKE_TIMEOUT_MS = 30 * 60_000;
-const IMAGE_TIMEOUT_MS = 45 * 60_000;
+// Creating an image from a 40 GB disk took 9 minutes once and over 45 the next day.
+const IMAGE_TIMEOUT_MS = 75 * 60_000;
 const AUTO_RELEASE_MINUTES = 90;
 
 const region = () => setting('ALIYUN_REGION', 'ap-southeast-5');

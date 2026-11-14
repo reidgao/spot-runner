@@ -98,7 +98,7 @@ The start action lists the zones that sell each wanted type as spot, reads each 
 
 ## The bake
 
-A small spot machine boots plain Ubuntu, installs Docker, pulls the given images, installs the runner (in `/home/ci/actions-runner`, with its work directory in `/home/ci/work` so a newer runner swapped in at boot keeps the tool cache) and Node, runs `cloud-init clean` and powers off. The action then creates the image from the stopped machine, destroys the machine and prunes old images. A whole bake took about 12 minutes on 2026-11-14.
+A small spot machine boots plain Ubuntu, installs Docker, pulls the given images, installs the runner (in `/home/ci/actions-runner`, with its work directory in `/home/ci/work` so a newer runner swapped in at boot keeps the tool cache) and Node, runs `cloud-init clean` and powers off. The action then creates the image from the stopped machine, destroys the machine and prunes old images. The build takes about 3 minutes; creating the image from the 40 GB disk took 9 minutes on one day and over 45 the next, so the action waits up to 75 minutes for it and the bake job should allow 90.
 
 ## Troubleshooting
 
