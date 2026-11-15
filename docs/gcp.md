@@ -5,7 +5,7 @@
 ## What a VM looks like
 
 - **Spot, and it deletes itself.** `provisioningModel: SPOT` with `instanceTerminationAction: DELETE`: Google Cloud deletes the VM when it reclaims it, and after `max-run-minutes` (default 90) even if the stop job never runs.
-- **No stored key.** In GitHub Actions the scripts trade the job's OIDC token for a Google token through Workload Identity Federation, and for a service account's token when you name one.
+- **No stored key.** In GitHub Actions the scripts trade the job's OIDC token for a Google token through Workload Identity Federation, and for a service account's token when you name one. Verified from GitHub Actions on 2026-11-15 (see [Measured](#measured)).
 - **Its own network.** A VPC named `ci-runner` with automatic subnets and no firewall rule, so Google Cloud's implied rules let traffic out and nothing in.
 - **No credentials on the VM.** No service account is attached, so a job cannot reach your project.
 - **An ephemeral external IP** for outbound traffic.
@@ -25,6 +25,17 @@ On 2026-11-14 in `us-central1`, from a workstation with a gcloud token:
 | Runner online, from the baked image | 50 s |
 
 The baked image (Docker, the Playwright container image, the runner and Node) took 3.8 GB in the `us` multi-region. No full test suite has run on Google Cloud yet, so measure your worker counts on your own machine type.
+
+On 2026-11-15, from GitHub Actions in a private repository, signed in through Workload Identity Federation and the service account with no stored key, after the [setup](#2-workload-identity-federation) was run as written in a project that had none of it:
+
+| Step | Time |
+| --- | --- |
+| Sign in (OIDC token, STS, the service account's token) and find the offers | 4 s |
+| Buy an `e2-standard-2` spot VM (request to running) | 13 s |
+| Runner online, from plain Ubuntu (Docker and the runner, no container image) | 108 s |
+| Stop: delete the VM | 60 s |
+
+The job on the VM saw a spot VM (`scheduling/preemptible` is `TRUE`) with no service account attached, and the stop left no runner registration behind. The first run, started a minute after the setup, was refused at the service account step; see the note under the setup.
 
 ## Setup
 
@@ -71,6 +82,8 @@ gcloud compute networks create ci-runner --project $PROJECT --subnet-mode auto
 echo "workload-identity-provider: projects/$NUMBER/locations/global/workloadIdentityPools/github/providers/github"
 echo "service-account: ci-runner@$PROJECT.iam.gserviceaccount.com"
 ```
+
+IAM takes a few minutes to apply new bindings. A run started right after the setup can fail with `iam.serviceAccounts.getAccessToken` denied; re-run it a few minutes later (on 2026-11-15 a re-run four minutes later passed). The `networks create` line fails with `already exists` when the network is there already, for example after a local test run made it; that is fine.
 
 To let another repository use it, add one more `roles/iam.workloadIdentityUser` binding with that repository's name.
 
@@ -152,7 +165,8 @@ The builder is a small standard VM, not a spot one, so it cannot be reclaimed ha
 ## Troubleshooting
 
 - **`no GitHub OIDC token`**: the job lacks `permissions: id-token: write`.
-- **`iam.serviceAccounts.getAccessToken` denied**: the `roles/iam.workloadIdentityUser` binding names another repository, or the provider's attribute condition rejects this one.
+- **`iam.serviceAccounts.getAccessToken` denied**: the `roles/iam.workloadIdentityUser` binding is less than a few minutes old (re-run later) or names another repository.
+- **`The given credential is rejected by the attribute condition`** (from `sts.googleapis.com`): the repository's owner is not the one in the provider's attribute condition.
 - **`QUOTA_EXCEEDED` in every zone**: request quota for the family, and for Preemptible CPUs or CPUs in the region.
 - **The runner never comes online**: the first-boot script's log is on the serial console:
 
