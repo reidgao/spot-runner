@@ -81,7 +81,7 @@ The [overview](../README.md#quick-start) has the start, test and stop jobs, the 
 | start | `max-cny-per-hour` | `20` | Offers above it are skipped, and it is sent as the spot price limit |
 | start | `prepull-images` | | Docker images the job needs, pulled at boot when the image lacks them |
 | start | `disk-gb` | `100` | System disk size |
-| start, bake | `image-prefix` | `ci-runner-<repository>-` | Name prefix of this repository's images |
+| start, bake | `image-prefix` | `ci-runner-<repository>-` | Name prefix of this repository's images. Only `<prefix><timestamp>` names count as its own |
 | stop | `instance-id`, `label` | | The start action's outputs |
 | sweep | `prefixes` | `ci-` | Machine names to sweep |
 | sweep | `max-age-minutes` | `75` | Destroy machines older than this |
@@ -114,4 +114,10 @@ The script also reads keys from a local `aliyun` CLI profile:
 ```bash
 ALIYUN_PROFILE=my-profile node aliyun-runner.mjs sweep
 ALIYUN_PROFILE=my-profile node aliyun-runner.mjs network
+```
+
+With `SPOT_DRY_RUN=1`, `start` does everything but buy: it prints the offers and the image it would boot from, and sends the purchase as a dry run that Alibaba Cloud only checks. It still creates the network when it is missing.
+
+```bash
+ALIYUN_PROFILE=my-profile SPOT_DRY_RUN=1 GITHUB_REPOSITORY=owner/repo GITHUB_RUN_ID=0 GITHUB_RUN_ATTEMPT=1 node aliyun-runner.mjs start
 ```
