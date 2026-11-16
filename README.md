@@ -66,7 +66,7 @@ jobs:
       - id: spot
         # Fall back to GitHub's runners when no machine can be bought.
         continue-on-error: true
-        uses: reidgao/spot-runner/aliyun/start@v2
+        uses: reidgao/spot-runner/aliyun/start@v2.1
         with:
           access-key-id: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
           access-key-secret: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
@@ -91,7 +91,7 @@ jobs:
     if: ${{ always() && needs.spot-start.outputs.instance-id != '' }}
     runs-on: ubuntu-24.04
     steps:
-      - uses: reidgao/spot-runner/aliyun/stop@v2
+      - uses: reidgao/spot-runner/aliyun/stop@v2.1
         with:
           access-key-id: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
           access-key-secret: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
@@ -99,7 +99,7 @@ jobs:
           instance-id: ${{ needs.spot-start.outputs.instance-id }}
           label: ${{ needs.spot-start.outputs.label }}
       - if: ${{ always() }}
-        uses: reidgao/spot-runner/aliyun/sweep@v2
+        uses: reidgao/spot-runner/aliyun/sweep@v2.1
         with:
           access-key-id: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
           access-key-secret: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
@@ -122,12 +122,12 @@ Give each cloud's start step `continue-on-error: true`, and run the next one onl
 ```yaml
       - id: aliyun
         continue-on-error: true
-        uses: reidgao/spot-runner/aliyun/start@v2
+        uses: reidgao/spot-runner/aliyun/start@v2.1
         with: { ... }
       - id: tencent
         if: ${{ steps.aliyun.outputs.ready != 'true' }}
         continue-on-error: true
-        uses: reidgao/spot-runner/tencent/start@v2
+        uses: reidgao/spot-runner/tencent/start@v2.1
         with: { ... }
 ```
 
@@ -147,7 +147,7 @@ jobs:
   sweep:
     runs-on: ubuntu-24.04
     steps:
-      - uses: reidgao/spot-runner/aliyun/sweep@v2
+      - uses: reidgao/spot-runner/aliyun/sweep@v2.1
         with:
           access-key-id: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
           access-key-secret: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
@@ -171,7 +171,7 @@ jobs:
     # Alibaba Cloud can take most of an hour to create an image.
     timeout-minutes: 90
     steps:
-      - uses: reidgao/spot-runner/aliyun/bake@v2
+      - uses: reidgao/spot-runner/aliyun/bake@v2.1
         with:
           access-key-id: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
           access-key-secret: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
@@ -179,7 +179,7 @@ jobs:
           node-versions: '22.23.4'
 ```
 
-Each repository bakes, boots from and prunes only its own images (`ci-runner-<repository>…`), and the two newest are kept.
+Each repository bakes, boots from and prunes only its own images, and the two newest are kept. On Alibaba Cloud they are named `<prefix><timestamp>` (prefix `ci-runner-<repository>-` unless `image-prefix` sets one), and an image counts only when the timestamp follows the prefix directly, so `unisong` leaves `unisong-website`'s images alone. On Google Cloud each repository has its own image family, `ci-runner-<repository>`.
 
 ## The GitHub token
 
@@ -206,18 +206,20 @@ Every action is a thin wrapper around one script per cloud (`aliyun-runner.mjs`,
 GCP_ACCESS_TOKEN="$(gcloud auth print-access-token)" GCP_PROJECT=my-ci-project node gcp-runner.mjs sweep
 ```
 
-`start` also needs `GITHUB_REPOSITORY`, `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT` and `RUNNER_GITHUB_TOKEN`; each action file lists the variables it sets. The scripts need Node 20 or later and nothing else.
+`start` also needs `GITHUB_REPOSITORY`, `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT` and `RUNNER_GITHUB_TOKEN`; each action file lists the variables it sets. The scripts need Node 20 or later and nothing else. `node --test` runs the tests.
 
 | File | Holds |
 | --- | --- |
 | `aliyun-runner.mjs`, `gcp-runner.mjs`, `tencent-runner.mjs` | Each cloud's API calls and the start, stop, sweep and bake commands |
 | `common.mjs` | Settings, polling, names, outputs and the GitHub API, shared by the Alibaba and Google scripts |
+| `common.test.mjs` | Tests for `common.mjs` |
 | `boot-scripts.mjs` | The first-boot scripts for Alibaba and Google: the bake, and the boot that serves one job |
 
 ## Versions
 
-- `@v2`: the layout above, a folder per cloud.
-- `@v1`: the original Tencent Cloud actions at the repository root (`start`, `stop`, `sweep`), from when this repository was called `tencent-spot-runner`. They still work, and GitHub redirects the old repository name, but new workflows should use `@v2`.
+- `@v2.1`: the layout above, a folder per cloud. On Alibaba Cloud an image belongs to a repository only when the timestamp follows its prefix directly.
+- `@v2`: the same layout, but on Alibaba Cloud every image whose name began with the repository's prefix counted as its own. A repository whose name begins another's, such as `unisong` and `unisong-website`, booted from whichever repository's image was newest, and its bake kept only the two newest images of both, deleting the other's. Move such a repository to `@v2.1`, or give it an `image-prefix` that begins no other repository's images.
+- `@v1`: the original Tencent Cloud actions at the repository root (`start`, `stop`, `sweep`), from when this repository was called `tencent-spot-runner`. They still work, and GitHub redirects the old repository name, but new workflows should use `@v2.1`.
 
 `main` may move ahead of the newest tag. Pin a tag, or a commit for full control.
 

@@ -24,6 +24,7 @@ import { join } from 'node:path';
 import { bakeScript, bootScript } from './boot-scripts.mjs';
 import {
   NAME_PREFIX,
+  isImageOf,
   isoSeconds,
   latestRunnerVersion,
   machineName,
@@ -57,7 +58,7 @@ const IMAGE_TIMEOUT_MS = 75 * 60_000;
 const AUTO_RELEASE_MINUTES = 90;
 
 const region = () => setting('ALIYUN_REGION', 'ap-southeast-5');
-/** Each repository bakes, boots from and prunes only its own images. */
+/** Each repository bakes, boots from and prunes only its own images, named <prefix><stamp>. */
 const imagePrefix = () => setting('SPOT_IMAGE_PREFIX', `ci-runner-${repoSlug()}-`);
 
 /** Keys from the environment, or from a local aliyun CLI profile. */
@@ -247,7 +248,7 @@ async function publicImage() {
 /** This repository's baked images, newest first. */
 async function images(status = 'Available') {
   const { Images } = await ecs('DescribeImages', { ImageOwnerAlias: 'self', Status: status, PageSize: 100 });
-  return Images.Image.filter((image) => image.ImageName.startsWith(imagePrefix())).sort((a, b) =>
+  return Images.Image.filter((image) => isImageOf(imagePrefix(), image.ImageName)).sort((a, b) =>
     b.CreationTime.localeCompare(a.CreationTime),
   );
 }

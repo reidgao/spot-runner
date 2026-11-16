@@ -106,7 +106,7 @@ The start and stop steps of the [overview's quick start](../README.md#quick-star
 ```yaml
       - id: spot
         continue-on-error: true
-        uses: reidgao/spot-runner/gcp/start@v2
+        uses: reidgao/spot-runner/gcp/start@v2.1
         with:
           project: my-ci-project
           workload-identity-provider: projects/123456789/locations/global/workloadIdentityPools/github/providers/github
@@ -117,7 +117,7 @@ The start and stop steps of the [overview's quick start](../README.md#quick-star
 ```
 
 ```yaml
-      - uses: reidgao/spot-runner/gcp/stop@v2
+      - uses: reidgao/spot-runner/gcp/stop@v2.1
         with:
           project: my-ci-project
           workload-identity-provider: projects/123456789/locations/global/workloadIdentityPools/github/providers/github

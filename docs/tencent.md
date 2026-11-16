@@ -73,7 +73,7 @@ The [overview's quick start](../README.md#quick-start) with Tencent Cloud's inpu
 ```yaml
       - id: spot
         continue-on-error: true
-        uses: reidgao/spot-runner/tencent/start@v2
+        uses: reidgao/spot-runner/tencent/start@v2.1
         with:
           secret-id: ${{ secrets.TENCENT_SECRET_ID }}
           secret-key: ${{ secrets.TENCENT_SECRET_KEY }}
@@ -83,7 +83,7 @@ The [overview's quick start](../README.md#quick-start) with Tencent Cloud's inpu
 ```
 
 ```yaml
-      - uses: reidgao/spot-runner/tencent/stop@v2
+      - uses: reidgao/spot-runner/tencent/stop@v2.1
         with:
           secret-id: ${{ secrets.TENCENT_SECRET_ID }}
           secret-key: ${{ secrets.TENCENT_SECRET_KEY }}
@@ -91,7 +91,7 @@ The [overview's quick start](../README.md#quick-start) with Tencent Cloud's inpu
           instance-id: ${{ needs.spot-start.outputs.instance-id }}
           label: ${{ needs.spot-start.outputs.label }}
       - if: ${{ always() }}
-        uses: reidgao/spot-runner/tencent/sweep@v2
+        uses: reidgao/spot-runner/tencent/sweep@v2.1
         with:
           secret-id: ${{ secrets.TENCENT_SECRET_ID }}
           secret-key: ${{ secrets.TENCENT_SECRET_KEY }}

@@ -17,7 +17,7 @@ inputs:
     description: Alibaba Cloud region.
     default: ap-southeast-5
   image-prefix:
-    description: Name prefix of this repository's images (default ci-runner-<repository>-).
+    description: Name prefix of this repository's images (default ci-runner-<repository>-). Only <prefix><timestamp> names count as this repository's, so only those are pruned.
     default: ''
   builder-types:
     description: Space-separated instance types to build on, first available wins.

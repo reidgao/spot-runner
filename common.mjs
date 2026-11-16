@@ -29,6 +29,14 @@ export function repoSlug() {
 
 /** A timestamp for image and builder names, such as 20261114-153000. */
 export const stamp = () => isoSeconds(new Date()).replace(/[-:]/g, '').replace('T', '-').replace('Z', '');
+const STAMP = /^\d{8}-\d{6}$/;
+
+/**
+ * Whether an image name is the prefix followed directly by a stamp(). The
+ * prefix alone is not enough: ci-runner-unisong- also begins
+ * ci-runner-unisong-website-20261114-153000, another repository's image.
+ */
+export const isImageOf = (prefix, name) => name.startsWith(prefix) && STAMP.test(name.slice(prefix.length));
 
 /** Machine and runner name: ci-<repo>-<run>-<attempt>, lowercase, at most 60 characters. */
 export function machineName() {

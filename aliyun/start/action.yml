@@ -29,7 +29,7 @@ inputs:
     description: System disk size in GB.
     default: '100'
   image-prefix:
-    description: Name prefix of this repository's baked images (default ci-runner-<repository>-).
+    description: Name prefix of this repository's baked images (default ci-runner-<repository>-). Only <prefix><timestamp> names count as this repository's.
     default: ''
 outputs:
   ready:
