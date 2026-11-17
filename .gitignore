@@ -1,0 +1,3 @@
+# Local Worker runs (sweeper/): keys for wrangler dev, and its state.
+.dev.vars
+.wrangler/

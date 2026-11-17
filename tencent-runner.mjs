@@ -8,25 +8,18 @@
  *   node tencent-runner.mjs sweep   destroy any CI machine left behind
  *
  * Called by the start, stop and sweep actions in this repository, which pass
- * every setting as an environment variable. The Tencent Cloud API is called
- * with node:crypto and fetch rather than an SDK, so no third-party package
- * ever runs next to the keys.
+ * every setting as an environment variable. The Tencent Cloud API client and
+ * the sweep itself are in tencent-cvm.mjs, which the sweeper Worker shares.
  */
-import { createHash, createHmac, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { appendFileSync } from 'node:fs';
-
-const HOST = 'cvm.tencentcloudapi.com';
-const SERVICE = 'cvm';
-const API_VERSION = '2017-03-12';
-const CONTENT_TYPE = 'application/json; charset=utf-8';
-const SIGNED_HEADERS = 'content-type;host;x-tc-action';
+import { DEFAULT_MAX_AGE_MINUTES, NAME_PREFIX, cvmClient, sweep as sweepStale } from './tencent-cvm.mjs';
 
 const X86_FAMILY = /^(SA[2-9]|S[5-9]|C[5-9]|CA[2-9]|M[5-9]|MA[2-9])\./;
 const MAX_ATTEMPTS = 8;
 const RUNNER_ONLINE_TIMEOUT_MS = 8 * 60_000;
 const POLL_MS = 10_000;
 const BANDWIDTH_MBPS = 100;
-const NAME_PREFIX = 'ci-';
 const DEFAULT_SIZES = '[{"cpu":32},{"cpu":16}]';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -49,58 +42,17 @@ function sizes() {
   return list;
 }
 
-/* ── Tencent Cloud API (TC3-HMAC-SHA256) ─────────────────────────────── */
+/* ── Tencent Cloud API ───────────────────────────────────────────────── */
 
-const sha256 = (text) => createHash('sha256').update(text, 'utf8').digest('hex');
-const hmac = (key, text) => createHmac('sha256', key).update(text, 'utf8');
-
-function authorization(action, payload, timestamp) {
-  const id = required('TENCENT_SECRET_ID');
-  const key = required('TENCENT_SECRET_KEY');
-  const date = new Date(timestamp * 1000).toISOString().slice(0, 10);
-  const scope = `${date}/${SERVICE}/tc3_request`;
-  const canonical = [
-    'POST',
-    '/',
-    '',
-    `content-type:${CONTENT_TYPE}`,
-    `host:${HOST}`,
-    `x-tc-action:${action.toLowerCase()}`,
-    '',
-    SIGNED_HEADERS,
-    sha256(payload),
-  ].join('\n');
-  const toSign = ['TC3-HMAC-SHA256', timestamp, scope, sha256(canonical)].join('\n');
-  const dated = hmac(`TC3${key}`, date).digest();
-  const service = hmac(dated, SERVICE).digest();
-  const signing = hmac(service, 'tc3_request').digest();
-  const signature = hmac(signing, toSign).digest('hex');
-  return `TC3-HMAC-SHA256 Credential=${id}/${scope}, SignedHeaders=${SIGNED_HEADERS}, Signature=${signature}`;
-}
-
-async function cvm(action, params = {}) {
-  const payload = JSON.stringify(params);
-  const timestamp = Math.floor(Date.now() / 1000);
-  const response = await fetch(`https://${HOST}/`, {
-    method: 'POST',
-    headers: {
-      Authorization: authorization(action, payload, timestamp),
-      'Content-Type': CONTENT_TYPE,
-      Host: HOST,
-      'X-TC-Action': action,
-      'X-TC-Version': API_VERSION,
-      'X-TC-Timestamp': String(timestamp),
-      'X-TC-Region': region(),
-    },
-    body: payload,
+let client;
+/** One call to the CVM API with the keys and region from the environment. */
+function cvm(action, params) {
+  client ??= cvmClient({
+    secretId: required('TENCENT_SECRET_ID'),
+    secretKey: required('TENCENT_SECRET_KEY'),
+    region: region(),
   });
-  const { Response: result } = await response.json();
-  if (result?.Error) {
-    throw Object.assign(new Error(`${action}: ${result.Error.Code}: ${result.Error.Message}`), {
-      code: result.Error.Code,
-    });
-  }
-  return result;
+  return client(action, params);
 }
 
 /* ── GitHub API ──────────────────────────────────────────────────────── */
@@ -301,19 +253,13 @@ async function stop() {
 
 async function sweep() {
   const prefixes = setting('SPOT_SWEEP_PREFIXES', NAME_PREFIX).split(/\s+/).filter(Boolean);
-  const maxAgeMs = Number(setting('SPOT_MAX_AGE_MINUTES', '75')) * 60_000;
-  const { InstanceSet: instances } = await cvm('DescribeInstances', { Limit: 100 });
-  const stale = instances.filter(
-    (item) =>
-      prefixes.some((prefix) => item.InstanceName.startsWith(prefix)) && Date.now() - Date.parse(item.CreatedTime) > maxAgeMs,
-  );
+  const maxAgeMinutes = Number(setting('SPOT_MAX_AGE_MINUTES', String(DEFAULT_MAX_AGE_MINUTES)));
+  const stale = await sweepStale(cvm, { prefixes, maxAgeMinutes });
   if (stale.length === 0) {
     console.info('No CI machine left behind');
     return;
   }
-  const ids = stale.map((item) => item.InstanceId);
-  await cvm('TerminateInstances', { InstanceIds: ids });
-  console.info(`Destroyed ${ids.join(', ')}`);
+  console.info(`Destroyed ${stale.map((machine) => machine.id).join(', ')}`);
 }
 
 const commands = { start, stop, sweep };
