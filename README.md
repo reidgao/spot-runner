@@ -28,7 +28,7 @@ Use it only from **private** repositories. A self-hosted runner on a public repo
 | Sign-in | RAM user's AccessKey, in repository secrets | Workload Identity Federation, no stored key | CAM sub-user's SecretId and SecretKey, in repository secrets |
 | You list | Instance types (`ecs.g9ae.24xlarge`) | Machine types (`c4d-highcpu-96`) | vCPU counts; the cheapest x86 type with that count is bought |
 | Price cap | `max-cny-per-hour`, also sent as the spot price limit | None needed: spot prices change at most once a month | `max-cny-per-hour` |
-| Destroys itself | 90 minutes after purchase, and it is never reclaimed in its first hour | After `max-run-minutes` (default 90), and when reclaimed | No; the sweep is the only backstop |
+| Destroys itself | 90 minutes after purchase, and it is never reclaimed in its first hour | After `max-run-minutes` (default 90), and when reclaimed | No; the sweeps destroy it, and the [sweeper Worker](docs/tencent.md#a-sweep-outside-github) does when GitHub runs no job |
 | Baked image | Yes | Yes | No |
 | Default region | `ap-southeast-5` (Jakarta) | `us-central1` (Iowa) | `ap-hongkong` |
 
@@ -155,6 +155,8 @@ jobs:
 
 One sweep covers every repository that uses the tool in that account and region (on Google Cloud, in that project).
 
+Both layers are GitHub jobs. An Alibaba or Google machine also destroys itself, but a Tencent machine cannot, so when GitHub starts no job at all (an outage, a billing block) nothing would destroy it. For Tencent Cloud, deploy the [sweeper Worker](docs/tencent.md#a-sweep-outside-github) as well: a Cloudflare cron that runs the same sweep every ten minutes.
+
 ### A baked image
 
 On Alibaba Cloud and Google Cloud a weekly bake keeps the boot image current. A machine fetches whatever is newer than its image at boot (a newer runner, a container image the image lacks), so an image that is a little behind still works, only slower. Bake again when the job's container image or Node version changes:
@@ -213,10 +215,14 @@ GCP_ACCESS_TOKEN="$(gcloud auth print-access-token)" GCP_PROJECT=my-ci-project n
 | `aliyun-runner.mjs`, `gcp-runner.mjs`, `tencent-runner.mjs` | Each cloud's API calls and the start, stop, sweep and bake commands |
 | `common.mjs` | Settings, polling, names, outputs and the GitHub API, shared by the Alibaba and Google scripts |
 | `common.test.mjs` | Tests for `common.mjs` |
+| `tencent-cvm.mjs` | The Tencent Cloud API client and the sweep, shared by `tencent-runner.mjs` and the sweeper Worker |
+| `tencent-cvm.test.mjs` | Tests for `tencent-cvm.mjs` |
 | `boot-scripts.mjs` | The first-boot scripts for Alibaba and Google: the bake, and the boot that serves one job |
+| `sweeper/` | The sweeper Worker for Tencent Cloud: `src/index.js`, its tests, `wrangler.jsonc` and `deploy.sh` |
 
 ## Versions
 
+- `@v2.2`: adds the sweeper Worker (`sweeper/`) for Tencent Cloud. The Tencent actions behave as in `@v2.1`; their API client moved to `tencent-cvm.mjs`, which the Worker shares.
 - `@v2.1`: the layout above, a folder per cloud. On Alibaba Cloud an image belongs to a repository only when the timestamp follows its prefix directly.
 - `@v2`: the same layout, but on Alibaba Cloud every image whose name began with the repository's prefix counted as its own. A repository whose name begins another's, such as `unisong` and `unisong-website`, booted from whichever repository's image was newest, and its bake kept only the two newest images of both, deleting the other's. Move such a repository to `@v2.1`, or give it an `image-prefix` that begins no other repository's images.
 - `@v1`: the original Tencent Cloud actions at the repository root (`start`, `stop`, `sweep`), from when this repository was called `tencent-spot-runner`. They still work, and GitHub redirects the old repository name, but new workflows should use `@v2.1`.

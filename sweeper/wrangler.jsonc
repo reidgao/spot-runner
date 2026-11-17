@@ -1,0 +1,44 @@
+{
+  // Destroys Tencent Cloud CI machines left behind, without GitHub: a cron
+  // every ten minutes (docs/tencent.md, "A sweep outside GitHub"). Deploy it
+  // with sweeper/deploy.sh, which asks for the keys.
+  "name": "ci-spot-sweeper",
+  "main": "./src/index.js",
+  "compatibility_date": "2026-11-03",
+  // tencent-cvm.mjs signs requests with node:crypto.
+  "compatibility_flags": ["nodejs_compat"],
+
+  // No public address: the cron is the only way in.
+  "workers_dev": false,
+  "preview_urls": false,
+
+  // Every ten minutes. src/index.js tells a lasting failure once an hour and
+  // counts on this interval (CRON_MINUTES): change both together.
+  "triggers": {
+    "crons": ["*/10 * * * *"]
+  },
+
+  "vars": {
+    // The region the CI machines are bought in.
+    "TENCENT_REGION": "ap-hongkong",
+    // Space-separated machine-name prefixes. Every machine this tool buys is
+    // named ci-<repository>-<run>-<attempt>.
+    "SWEEP_PREFIXES": "ci-",
+    // Longer than any job runs. The actions' sweeps use the same age.
+    "MAX_AGE_MINUTES": "75"
+    // DRY_RUN "1" (deploy.sh --dry-run) only logs what it would destroy.
+  },
+
+  // TENCENT_SECRET_ID, TENCENT_SECRET_KEY: a CAM sub-user that can list
+  // instances and destroy them in that region, and nothing else
+  // (docs/tencent.md). `wrangler deploy` fails while either is missing.
+  // NOTIFY_URL, optional: where a push goes when a machine was destroyed or
+  // the sweep fails.
+  "secrets": {
+    "required": ["TENCENT_SECRET_ID", "TENCENT_SECRET_KEY"]
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}
